@@ -1,0 +1,164 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b0d10">
+  <meta name="description" content="在浏览器本地预览 PSD 卡牌的彩虹镭射、银箔与金箔效果。">
+  <title>光谱卡 · 特种纸预览工作台</title>
+  <link rel="stylesheet" href="./styles.css">
+  <script src="./vendor/ag-psd.js" defer></script>
+  <script src="./app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="#workspace" aria-label="光谱卡首页">
+      <span class="brand-mark" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>
+      <span class="brand-copy">
+        <strong>光谱卡</strong>
+        <small>特种纸预览工作台</small>
+      </span>
+    </a>
+
+    <div class="topbar-actions">
+      <span class="privacy-badge"><span aria-hidden="true">●</span> 文件仅在本地处理</span>
+      <label class="primary-button" for="psdInput">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12m0-12 4.5 4.5M12 3 7.5 7.5M5 13v6h14v-6"/></svg>
+        导入 PSD
+      </label>
+      <input id="psdInput" class="visually-hidden" type="file" accept=".psd,image/vnd.adobe.photoshop">
+    </div>
+  </header>
+
+  <main id="workspace" class="workspace">
+    <aside class="panel layers-panel" aria-labelledby="layersTitle">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">DOCUMENT</p>
+          <h1 id="layersTitle">图层</h1>
+        </div>
+        <span id="layerCount" class="count-badge">4</span>
+      </div>
+
+      <div class="document-summary">
+        <div class="document-icon" aria-hidden="true">
+          <span></span>
+        </div>
+        <div>
+          <strong id="documentName">示例卡牌.psd</strong>
+          <span id="documentMeta">750 × 1050 px · 4 个图层</span>
+        </div>
+      </div>
+
+      <div id="layerList" class="layer-list" role="listbox" aria-label="PSD 图层"></div>
+
+      <div class="panel-note">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 8v5m0 3.5v.1M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17Z"/></svg>
+        <p>请选择一个普通像素图层应用特效。蒙版、调整层和图层样式请先在 Photoshop 中栅格化。</p>
+      </div>
+    </aside>
+
+    <section id="previewStage" class="preview-stage" aria-labelledby="previewTitle">
+      <div class="stage-heading">
+        <div>
+          <p class="eyebrow">LIVE PREVIEW</p>
+          <h2 id="previewTitle">卡牌预览</h2>
+        </div>
+        <span id="statusPill" class="status-pill"><span aria-hidden="true"></span>示例模式</span>
+      </div>
+
+      <div id="dropZone" class="card-scene">
+        <div class="scene-orbit orbit-one" aria-hidden="true"></div>
+        <div class="scene-orbit orbit-two" aria-hidden="true"></div>
+        <div class="scene-grid" aria-hidden="true"></div>
+
+        <div id="tiltShell" class="card-shell" tabindex="0" role="img" aria-label="可拖动旋转的卡牌预览">
+          <div id="card" class="card">
+            <div id="cardContent" class="card-content"></div>
+            <div class="card-glare" aria-hidden="true"></div>
+            <div class="card-edge" aria-hidden="true"></div>
+          </div>
+        </div>
+
+        <div id="dropPrompt" class="drop-prompt" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 4v10m0-10 4 4m-4-4L8 8M5 14v5h14v-5"/></svg>
+          <strong>松开以读取 PSD</strong>
+        </div>
+      </div>
+
+      <div class="preview-toolbar">
+        <div class="drag-tip">
+          <span class="mouse-icon" aria-hidden="true"><i></i></span>
+          <span><strong>按住卡牌拖动</strong><small>移动鼠标或手指观察反光</small></span>
+        </div>
+        <div class="angle-readout" aria-label="当前卡牌角度">
+          <span>X <strong id="angleX">0°</strong></span>
+          <span>Y <strong id="angleY">0°</strong></span>
+        </div>
+        <button id="resetTilt" class="ghost-button" type="button">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V4m0 0h4M5 4l3.2 3.2A7 7 0 1 1 5.6 15"/></svg>
+          重置角度
+        </button>
+      </div>
+    </section>
+
+    <aside class="panel effects-panel" aria-labelledby="effectsTitle">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">MATERIAL</p>
+          <h2 id="effectsTitle">特种纸效果</h2>
+        </div>
+      </div>
+
+      <div class="selected-layer-card">
+        <span>当前作用图层</span>
+        <strong id="selectedLayerName">镭射徽记</strong>
+      </div>
+
+      <fieldset class="effect-picker">
+        <legend>材质类型</legend>
+        <button class="effect-option is-active" type="button" data-effect="rainbow" aria-pressed="true">
+          <span class="effect-swatch swatch-rainbow" aria-hidden="true"></span>
+          <span><strong>彩虹镭射</strong><small>多色光谱</small></span>
+          <i aria-hidden="true"></i>
+        </button>
+        <button class="effect-option" type="button" data-effect="silver" aria-pressed="false">
+          <span class="effect-swatch swatch-silver" aria-hidden="true"></span>
+          <span><strong>银箔</strong><small>冷调金属</small></span>
+          <i aria-hidden="true"></i>
+        </button>
+        <button class="effect-option" type="button" data-effect="gold" aria-pressed="false">
+          <span class="effect-swatch swatch-gold" aria-hidden="true"></span>
+          <span><strong>金箔</strong><small>暖调金属</small></span>
+          <i aria-hidden="true"></i>
+        </button>
+      </fieldset>
+
+      <div class="intensity-control">
+        <div class="control-label">
+          <label for="intensity">特效强度</label>
+          <output id="intensityValue" for="intensity">68%</output>
+        </div>
+        <input id="intensity" type="range" min="0" max="100" value="68">
+        <div class="range-labels"><span>轻柔</span><span>强烈</span></div>
+      </div>
+
+      <div class="security-card">
+        <div class="security-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24"><path d="M12 3 5.5 5.6v5.2c0 4.1 2.6 7.8 6.5 9.2 3.9-1.4 6.5-5.1 6.5-9.2V5.6L12 3Zm-3 8.5 2 2 4-4"/></svg>
+        </div>
+        <div><strong>本地隐私保护</strong><p>PSD 内容停留在当前浏览器会话，不会上传至服务器。</p></div>
+      </div>
+
+      <div id="parserMessage" class="parser-message" role="status" aria-live="polite">
+        <span aria-hidden="true"></span>
+        <p>示例卡牌已就绪，可直接拖动体验。</p>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" role="alert" aria-live="assertive"></div>
+</body>
+</html>
