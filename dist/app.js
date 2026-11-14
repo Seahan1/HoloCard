@@ -383,7 +383,7 @@
     elements.cardContent.replaceChildren();
     var renderable = state.layers.filter(function (layer) {
       return !layer.isGroup && layer.canvas && !layer.hidden;
-    }).slice().reverse();
+    }).reverse();
 
     renderable.forEach(function (layer) {
       layer.canvas.className = "document-layer";
@@ -532,7 +532,7 @@
   }
 
   function describeLayerType(layer, supported) {
-    if (layer.children && layer.children.length) {
+    if (Array.isArray(layer.children)) {
       return "图层组";
     }
     if (supported) {
@@ -590,11 +590,14 @@
     }
   }
 
-  function parseLayerRecords(nodes, depth, records, sequence) {
-    nodes.forEach(function (layer) {
+  function parseLayerRecords(nodes, depth, records, sequence, parentHidden) {
+    // The bundled ag-psd returns each sibling list in bottom-to-top paint order.
+    for (var index = nodes.length - 1; index >= 0; index -= 1) {
+      var layer = nodes[index];
       var id = "psd-layer-" + sequence.value;
       sequence.value += 1;
-      var isGroup = Boolean(layer.children && layer.children.length);
+      var isGroup = Array.isArray(layer.children);
+      var hidden = parentHidden || Boolean(layer.hidden);
       var canvas = null;
       var supported = false;
 
@@ -610,7 +613,7 @@
       records.push({
         id: id,
         name: layer.name || "未命名图层",
-        hidden: Boolean(layer.hidden),
+        hidden: hidden,
         opacity: Number.isFinite(layer.opacity) ? layer.opacity : 1,
         blendMode: layer.blendMode || "normal",
         left: Number(layer.left || 0),
@@ -625,9 +628,9 @@
       });
 
       if (isGroup) {
-        parseLayerRecords(layer.children, depth + 1, records, sequence);
+        parseLayerRecords(layer.children, depth + 1, records, sequence, hidden);
       }
-    });
+    }
   }
 
   function friendlyParserError(error) {
@@ -670,7 +673,7 @@
       });
       inspectStructure(psd);
       var records = [];
-      parseLayerRecords(psd.children || [], 0, records, { value: 0 });
+      parseLayerRecords(psd.children || [], 0, records, { value: 0 }, false);
       var selectable = records.filter(function (layer) {
         return layer.supported && !layer.hidden;
       });
