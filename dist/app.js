@@ -11,6 +11,8 @@
   var KEYBOARD_TILT_STEP = 5;
   var MIN_ZOOM = 0.5;
   var MAX_ZOOM = 3;
+  var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+  var holoLight = { x: 0, y: 0, targetX: 0, targetY: 0, frame: null, time: null };
   var state = {
     documentWidth: 750,
     documentHeight: 1050,
@@ -401,6 +403,10 @@
     return layer.imageUrl;
   }
 
+  function isHolographic(effect) {
+    return effect === "rainbow" || effect === "cross-holo" || effect === "flake-holo";
+  }
+
   function renderCard() {
     elements.cardContent.replaceChildren();
     var renderable = state.layers.filter(function (layer) {
@@ -421,6 +427,7 @@
         effect.className = "material-effect effect-" + state.effect;
         effect.setAttribute("aria-hidden", "true");
         effect.style.setProperty("--effect-strength", String(state.intensity / 100));
+        effect.style.setProperty("--layer-opacity", String(layer.opacity));
         effect.style.webkitMaskImage = "url(" + JSON.stringify(maskUrl) + ")";
         effect.style.maskImage = "url(" + JSON.stringify(maskUrl) + ")";
         setPositionStyles(effect, layer);
@@ -701,17 +708,64 @@
     elements.resetZoom.setAttribute("aria-label", "重置缩放，当前 " + percent);
   }
 
-  function updateTiltVisuals() {
-    elements.cardRotator.style.transform = "rotateX(" + state.tiltX + "deg) rotateY(" + state.tiltY + "deg)";
+  function paintHoloLight() {
+    var style = elements.cardContent.style;
+    var x = holoLight.x;
+    var y = holoLight.y;
+    style.setProperty("--holo-x", String(x));
+    style.setProperty("--holo-y", String(y));
+    style.setProperty("--holo-energy", String(Math.min(1, Math.hypot(x, y))));
+  }
+
+  function animateHoloLight(time) {
+    var elapsed = holoLight.time === null ? 1000 / 60 : time - holoLight.time;
+    var fraction = 1 - Math.exp(-elapsed / 55);
+    holoLight.x += (holoLight.targetX - holoLight.x) * fraction;
+    holoLight.y += (holoLight.targetY - holoLight.y) * fraction;
+    if (Math.hypot(holoLight.targetX - holoLight.x, holoLight.targetY - holoLight.y) < 0.002) {
+      setHoloLight(holoLight.targetX, holoLight.targetY, false);
+      return;
+    }
+    holoLight.time = time;
+    paintHoloLight();
+    holoLight.frame = requestAnimationFrame(animateHoloLight);
+  }
+
+  function setHoloLight(x, y, smooth) {
+    holoLight.targetX = x;
+    holoLight.targetY = y;
+    if (smooth && !reducedMotion.matches && (x !== holoLight.x || y !== holoLight.y)) {
+      if (holoLight.frame === null) {
+        holoLight.frame = requestAnimationFrame(animateHoloLight);
+      }
+      return;
+    }
+    if (holoLight.frame !== null) {
+      cancelAnimationFrame(holoLight.frame);
+      holoLight.frame = null;
+      holoLight.time = null;
+    }
+    holoLight.x = x;
+    holoLight.y = y;
+    paintHoloLight();
+  }
+
+  function cardLightNormal() {
     var radians = Math.PI / 180;
     var x = state.tiltX * radians;
     var y = state.tiltY * radians;
-    var normalX = Math.sin(y);
-    var normalY = -Math.sin(x) * Math.cos(y);
+    return { x: Math.sin(y), y: -Math.sin(x) * Math.cos(y) };
+  }
+
+  function updateTiltVisuals() {
+    elements.cardRotator.style.transform = "rotateX(" + state.tiltX + "deg) rotateY(" + state.tiltY + "deg)";
+    var normal = cardLightNormal();
+    var normalX = normal.x;
+    var normalY = normal.y;
     elements.cardContent.style.setProperty("--shine-x", (50 + normalX * 42) + "%");
     elements.cardContent.style.setProperty("--shine-y", (50 + normalY * 42) + "%");
     elements.cardContent.style.setProperty("--shine-travel", String(Math.hypot(normalX, normalY)));
-    elements.cardContent.style.setProperty("--flake-hue", (normalX * 70 + normalY * 42) + "deg");
+    setHoloLight(normalX, normalY, false);
     elements.angleX.textContent = Math.round(state.tiltX) + "°";
     elements.angleY.textContent = Math.round(state.tiltY) + "°";
   }
@@ -964,11 +1018,26 @@
       };
       elements.tiltShell.classList.add("is-dragging");
       elements.tiltShell.setPointerCapture(event.pointerId);
+      var normal = cardLightNormal();
+      setHoloLight(normal.x, normal.y, true);
     });
 
     elements.tiltShell.addEventListener("pointermove", function (event) {
       var drag = state.drag;
-      if (!drag || drag.pointerId !== event.pointerId) {
+      if (!drag) {
+        if (event.pointerType === "mouse" && event.buttons === 0 && isHolographic(state.effect)) {
+          var bounds = elements.tiltShell.getBoundingClientRect();
+          if (bounds.width && bounds.height) {
+            setHoloLight(
+              clamp((event.clientX - bounds.left) / bounds.width * 2 - 1, -1, 1),
+              clamp((event.clientY - bounds.top) / bounds.height * 2 - 1, -1, 1),
+              true
+            );
+          }
+        }
+        return;
+      }
+      if (drag.pointerId !== event.pointerId) {
         return;
       }
       state.tiltY = clamp(state.tiltY + (event.clientX - drag.x) * drag.degreesPerPixelX, -MAX_TILT, MAX_TILT);
@@ -976,6 +1045,18 @@
       drag.x = event.clientX;
       drag.y = event.clientY;
       updateTiltVisuals();
+    });
+
+    elements.tiltShell.addEventListener("pointerleave", function () {
+      if (!state.drag && isHolographic(state.effect)) {
+        var normal = cardLightNormal();
+        setHoloLight(normal.x, normal.y, true);
+      }
+    });
+    reducedMotion.addEventListener("change", function () {
+      if (reducedMotion.matches) {
+        setHoloLight(holoLight.targetX, holoLight.targetY, false);
+      }
     });
 
     function endPointer(event) {
