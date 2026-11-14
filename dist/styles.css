@@ -265,20 +265,18 @@ h2 {
 
 .layer-item {
   display: grid;
-  grid-template-columns: 32px minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 32px;
   align-items: center;
-  gap: 8px;
+  gap: 4px;
   min-height: 52px;
-  padding: 6px 8px;
+  padding: 2px 2px 2px calc(2px + min(var(--layer-indent), 30px));
   border: 1px solid transparent;
   border-radius: var(--radius);
   background: var(--paper);
   color: var(--ink);
-  cursor: pointer;
-  text-align: left;
 }
 
-.layer-item:not(.is-unsupported):hover,
+.layer-item:hover,
 .effect-option:hover {
   background: var(--surface);
 }
@@ -291,9 +289,39 @@ h2 {
   background: var(--selected);
 }
 
-.layer-item.is-unsupported {
-  cursor: default;
+.layer-select,
+.layer-visibility {
+  min-width: 0;
+  min-height: 44px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  color: inherit;
+}
+
+.layer-visibility {
+  display: grid;
+  place-items: center;
+  padding: 0;
   color: var(--muted);
+}
+
+.layer-select {
+  display: grid;
+  grid-template-columns: 32px minmax(0, 1fr);
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  cursor: pointer;
+  text-align: left;
+}
+
+.layer-select:disabled {
+  cursor: default;
+}
+
+.layer-item.is-hidden .layer-select {
+  opacity: .58;
 }
 
 .layer-thumb {
@@ -321,7 +349,11 @@ h2 {
 }
 
 .layer-visibility {
-  color: var(--muted);
+  cursor: pointer;
+}
+
+.layer-visibility:hover {
+  background: var(--line);
 }
 
 .panel-note,

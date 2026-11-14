@@ -379,10 +379,26 @@
     node.style.height = (height / state.documentHeight * 100) + "%";
   }
 
+  function isLayerVisible(layer) {
+    for (var current = layer; current; current = current.parent) {
+      if (current.hidden) {
+        return false;
+      }
+    }
+    return true;
+  }
+
+  function layerImageUrl(layer) {
+    if (!layer.imageUrl) {
+      layer.imageUrl = layer.canvas.toDataURL("image/png");
+    }
+    return layer.imageUrl;
+  }
+
   function renderCard() {
     elements.cardContent.replaceChildren();
     var renderable = state.layers.filter(function (layer) {
-      return !layer.isGroup && layer.canvas && !layer.hidden;
+      return !layer.isGroup && layer.canvas && isLayerVisible(layer);
     }).reverse();
 
     renderable.forEach(function (layer) {
@@ -395,7 +411,7 @@
 
       if (layer.id === state.selectedId) {
         var effect = document.createElement("div");
-        var maskUrl = layer.canvas.toDataURL("image/png");
+        var maskUrl = layerImageUrl(layer);
         effect.className = "material-effect effect-" + state.effect;
         effect.setAttribute("aria-hidden", "true");
         effect.style.setProperty("--effect-strength", String(state.intensity / 100));
@@ -423,29 +439,32 @@
     return svg;
   }
 
+  function layerRow(layer) {
+    return elements.layerList.querySelector('[data-layer-id="' + layer.id + '"]');
+  }
+
   function renderLayerList() {
     elements.layerList.replaceChildren();
     state.layers.forEach(function (layer) {
-      var item = document.createElement("button");
-      item.type = "button";
+      var item = document.createElement("div");
       item.className = "layer-item";
-      item.setAttribute("role", "option");
-      item.setAttribute("aria-selected", layer.id === state.selectedId ? "true" : "false");
-      item.style.paddingLeft = (9 + layer.depth * 13) + "px";
+      item.setAttribute("role", "listitem");
+      item.dataset.layerId = layer.id;
+      item.style.setProperty("--layer-indent", layer.depth * 10 + "px");
+      item.classList.toggle("is-selected", layer.id === state.selectedId);
+      item.classList.toggle("is-hidden", !isLayerVisible(layer));
 
-      if (layer.id === state.selectedId) {
-        item.classList.add("is-selected");
-      }
-      if (!layer.supported || layer.isGroup) {
-        item.classList.add("is-unsupported");
-        item.setAttribute("aria-disabled", "true");
-      }
+      var select = document.createElement("button");
+      select.type = "button";
+      select.className = "layer-select";
+      select.disabled = !layer.supported || layer.isGroup;
+      select.setAttribute("aria-pressed", String(layer.id === state.selectedId));
 
       var thumb = document.createElement("span");
       thumb.className = "layer-thumb";
       if (layer.canvas) {
         var image = document.createElement("img");
-        image.src = layer.canvas.toDataURL("image/png");
+        image.src = layerImageUrl(layer);
         image.alt = "";
         thumb.appendChild(image);
       } else {
@@ -463,21 +482,27 @@
       copy.appendChild(name);
       copy.appendChild(type);
 
-      var visibility = document.createElement("span");
+      var visibility = document.createElement("button");
+      visibility.type = "button";
       visibility.className = "layer-visibility";
-      visibility.title = layer.hidden ? "PSD 中已隐藏" : "PSD 中可见";
+      visibility.setAttribute("aria-label", "显示图层：" + layer.name);
+      visibility.setAttribute("aria-pressed", String(!layer.hidden));
+      visibility.title = !layer.hidden && !isLayerVisible(layer) ? "上级图层组已隐藏" : layer.hidden ? "显示图层" : "隐藏图层";
       visibility.appendChild(makeEyeIcon(layer.hidden));
+      visibility.addEventListener("click", function () {
+        layer.hidden = !layer.hidden;
+        renderLayerList();
+        renderCard();
+        layerRow(layer).querySelector(".layer-visibility").focus({ preventScroll: true });
+      });
 
-      item.appendChild(thumb);
-      item.appendChild(copy);
-      item.appendChild(visibility);
-
-      if (layer.supported && !layer.isGroup) {
-        item.addEventListener("click", function () {
-          state.selectedId = layer.id;
-          renderAll();
-        });
-      }
+      select.append(thumb, copy);
+      item.append(select, visibility);
+      select.addEventListener("click", function () {
+        state.selectedId = layer.id;
+        renderAll();
+        layerRow(layer).querySelector(".layer-select").focus({ preventScroll: true });
+      });
       elements.layerList.appendChild(item);
     });
   }
@@ -540,7 +565,7 @@
       return "图层组";
     }
     if (supported) {
-      return layer.hidden ? "像素图层 · 已隐藏" : "像素图层";
+      return "像素图层";
     }
     return "需在 Photoshop 栅格化";
   }
@@ -594,14 +619,13 @@
     }
   }
 
-  function parseLayerRecords(nodes, depth, records, sequence, parentHidden) {
+  function parseLayerRecords(nodes, depth, records, sequence, parent) {
     // The bundled ag-psd returns each sibling list in bottom-to-top paint order.
     for (var index = nodes.length - 1; index >= 0; index -= 1) {
       var layer = nodes[index];
       var id = "psd-layer-" + sequence.value;
       sequence.value += 1;
       var isGroup = Array.isArray(layer.children);
-      var hidden = parentHidden || Boolean(layer.hidden);
       var canvas = null;
       var supported = false;
 
@@ -614,10 +638,11 @@
         supported = Boolean(canvas) && !hasAdvancedFeatures(layer);
       }
 
-      records.push({
+      var record = {
         id: id,
         name: layer.name || "未命名图层",
-        hidden: hidden,
+        hidden: Boolean(layer.hidden),
+        parent: parent,
         opacity: Number.isFinite(layer.opacity) ? layer.opacity : 1,
         blendMode: layer.blendMode || "normal",
         left: Number(layer.left || 0),
@@ -629,10 +654,11 @@
         typeLabel: describeLayerType(layer, supported),
         depth: depth,
         isGroup: isGroup
-      });
+      };
+      records.push(record);
 
       if (isGroup) {
-        parseLayerRecords(layer.children, depth + 1, records, sequence, hidden);
+        parseLayerRecords(layer.children, depth + 1, records, sequence, record);
       }
     }
   }
@@ -677,19 +703,16 @@
       });
       inspectStructure(psd);
       var records = [];
-      parseLayerRecords(psd.children || [], 0, records, { value: 0 }, false);
-      var selectable = records.filter(function (layer) {
-        return layer.supported && !layer.hidden;
+      parseLayerRecords(psd.children || [], 0, records, { value: 0 }, null);
+      var selectable = records.find(function (layer) {
+        return layer.supported && isLayerVisible(layer);
       });
-      if (!selectable.length) {
-        throw new Error("未找到可应用特效的普通可见像素图层，请先栅格化目标图层");
-      }
 
       state.documentWidth = psd.width;
       state.documentHeight = psd.height;
       state.documentName = file.name;
       state.layers = records;
-      state.selectedId = selectable[0].id;
+      state.selectedId = selectable ? selectable.id : null;
       state.tiltX = 0;
       state.tiltY = 0;
       elements.statusPill.lastChild.textContent = "PSD 已载入";
