@@ -87,15 +87,18 @@
       </div>
 
       <div class="preview-toolbar">
-        <p class="drag-tip">拖动卡牌查看反光或翻面</p>
+        <p class="drag-tip">拖动旋转 · 滚轮缩放</p>
         <div class="angle-readout" aria-label="当前卡牌角度">
           <span>X <strong id="angleX">0°</strong></span>
           <span>Y <strong id="angleY">0°</strong></span>
         </div>
-        <button id="resetTilt" class="ghost-button" type="button">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V4m0 0h4M5 4l3.2 3.2A7 7 0 1 1 5.6 15"/></svg>
-          重置角度
-        </button>
+        <div class="preview-actions">
+          <button id="resetZoom" class="ghost-button" type="button" aria-label="重置缩放，当前 100%" title="重置缩放">100%</button>
+          <button id="resetTilt" class="ghost-button" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V4m0 0h4M5 4l3.2 3.2A7 7 0 1 1 5.6 15"/></svg>
+            重置角度
+          </button>
+        </div>
       </div>
     </section>
 

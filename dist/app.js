@@ -9,6 +9,8 @@
   var MAX_LAYER_PIXELS = 60000000;
   var MAX_TILT = 180;
   var KEYBOARD_TILT_STEP = 5;
+  var MIN_ZOOM = 0.5;
+  var MAX_ZOOM = 3;
   var state = {
     documentWidth: 750,
     documentHeight: 1050,
@@ -19,6 +21,7 @@
     intensity: 68,
     tiltX: 0,
     tiltY: 0,
+    zoom: 1,
     drag: null,
     layerDrag: null,
     toastTimer: null
@@ -37,6 +40,7 @@
     cardRotator: document.getElementById("cardRotator"),
     tiltShell: document.getElementById("tiltShell"),
     resetTilt: document.getElementById("resetTilt"),
+    resetZoom: document.getElementById("resetZoom"),
     angleX: document.getElementById("angleX"),
     angleY: document.getElementById("angleY"),
     intensity: document.getElementById("intensity"),
@@ -689,6 +693,14 @@
     renderCard();
   }
 
+  function setZoom(value) {
+    state.zoom = clamp(value, MIN_ZOOM, MAX_ZOOM);
+    elements.tiltShell.style.setProperty("--preview-zoom", String(state.zoom));
+    var percent = Math.round(state.zoom * 100) + "%";
+    elements.resetZoom.textContent = percent;
+    elements.resetZoom.setAttribute("aria-label", "重置缩放，当前 " + percent);
+  }
+
   function updateTiltVisuals() {
     elements.cardRotator.style.transform = "rotateX(" + state.tiltX + "deg) rotateY(" + state.tiltY + "deg)";
     var radians = Math.PI / 180;
@@ -874,6 +886,7 @@
       state.selectedId = selectable ? selectable.id : null;
       state.tiltX = 0;
       state.tiltY = 0;
+      setZoom(1);
       elements.statusPill.lastChild.textContent = "PSD 已载入";
       setParserMessage("已在本地读取 " + records.filter(function (layer) { return !layer.isGroup; }).length + " 个图层。复杂图层会标记为需栅格化。", false);
       renderAll();
@@ -892,6 +905,16 @@
     elements.layerList.addEventListener("pointerup", finishLayerDrag);
     elements.layerList.addEventListener("pointercancel", finishLayerDrag);
     elements.layerList.addEventListener("lostpointercapture", finishLayerDrag);
+
+    elements.dropZone.addEventListener("wheel", function (event) {
+      if (event.ctrlKey || event.metaKey || event.deltaY === 0) {
+        return;
+      }
+      event.preventDefault();
+      var unit = event.deltaMode === 1 ? 16 : event.deltaMode === 2 ? elements.dropZone.clientHeight : 1;
+      setZoom(state.zoom * Math.exp(-event.deltaY * unit / 500));
+    }, { passive: false });
+    elements.resetZoom.addEventListener("click", function () { setZoom(1); });
 
     document.querySelectorAll('input[name="preview-background"]').forEach(function (option) {
       if (option.checked) {
@@ -967,6 +990,11 @@
     elements.tiltShell.addEventListener("lostpointercapture", endPointer);
 
     elements.tiltShell.addEventListener("keydown", function (event) {
+      if (event.key === "+" || event.key === "=" || event.key === "-") {
+        event.preventDefault();
+        setZoom(state.zoom * (event.key === "-" ? 1 / 1.1 : 1.1));
+        return;
+      }
       var handled = true;
       if (event.key === "ArrowLeft") {
         state.tiltY = clamp(state.tiltY - KEYBOARD_TILT_STEP, -MAX_TILT, MAX_TILT);

@@ -506,8 +506,10 @@ h2 {
 .card-scene {
   position: relative;
   display: grid;
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   min-height: 0;
+  overflow: clip;
   border-block: 1px solid var(--line);
   background: var(--work-surface);
   perspective: 1300px;
@@ -516,7 +518,7 @@ h2 {
 
 .card-shell {
   position: relative;
-  width: min(84cqw, 460px, calc(78cqh * var(--document-ratio, 0.7142857143)));
+  width: calc(min(84cqw, 460px, 78cqh * var(--document-ratio, 0.7142857143)) * var(--preview-zoom, 1));
   aspect-ratio: var(--document-ratio, 5 / 7);
   cursor: grab;
   touch-action: none;
@@ -736,6 +738,16 @@ h2 {
   text-align: right;
 }
 
+.preview-actions {
+  display: flex;
+  gap: 6px;
+}
+
+#resetZoom {
+  min-width: 64px;
+  font-variant-numeric: tabular-nums;
+}
+
 .selected-layer-card {
   display: grid;
   gap: 4px;
@@ -901,6 +913,11 @@ input[type="range"] {
 
   .preview-heading {
     display: grid;
+  }
+
+  .preview-toolbar {
+    flex-wrap: wrap;
+    gap: 8px;
   }
 
   h1 {
