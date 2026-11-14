@@ -524,16 +524,38 @@ h2 {
   mask-size: 100% 100%;
 }
 
-.effect-rainbow {
+.material-effect.effect-rainbow {
   background-image:
-    linear-gradient(115deg,
-      rgba(255, 60, 133, .92) 0%,
-      rgba(255, 198, 64, .9) 18%,
-      rgba(137, 255, 153, .86) 36%,
-      rgba(61, 222, 255, .92) 54%,
-      rgba(117, 100, 255, .94) 72%,
-      rgba(249, 90, 225, .92) 88%,
-      rgba(255, 60, 133, .92) 100%);
+    var(--glitter-grain),
+    repeating-linear-gradient(128deg, #34334d55 0% 7%, #f4f6ff55 13%, #32324b44 21% 27%),
+    linear-gradient(115deg, #ed71a2, #f4ce78 18%, #92eac3 38%, #69cfe8 56%, #8d89ec 74%, #e991d2 91%, #ed71a2);
+  background-size: 180px 180px, 250% 250%, 230% 230%;
+  background-position: 0 0, var(--shine-x) var(--shine-y), var(--shine-x) var(--shine-y);
+  background-blend-mode: soft-light, luminosity, normal;
+}
+
+.material-effect.effect-rainbow::before,
+.material-effect.effect-cross-holo::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(90deg, #e887af, #ffdf9c 25%, #7ce4ce 50%, #9aa4f5 75%, #e997cb),
+    repeating-linear-gradient(125deg, #23354b 0% 6%, #435364 7% 9%, #a6bfd0 10%, #263949 14% 21%);
+  background-size: 215% 100%, 220% 185%;
+  background-position: var(--shine-x) 0, var(--shine-x) var(--shine-y);
+  background-blend-mode: hue, normal;
+  mix-blend-mode: lighten;
+  opacity: calc(.16 + .33 * var(--shine-travel, 0));
+}
+
+.material-effect::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at var(--shine-x) var(--shine-y), #fff 0%, #fff7 14%, transparent 54%);
+  mix-blend-mode: screen;
+  opacity: calc(.12 + .32 * var(--shine-travel, 0));
 }
 
 .effect-silver {

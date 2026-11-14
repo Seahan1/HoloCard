@@ -508,11 +508,15 @@
 
   function updateTiltVisuals() {
     elements.cardRotator.style.transform = "rotateX(" + state.tiltX + "deg) rotateY(" + state.tiltY + "deg)";
-    var shineX = 50 + Math.sin(state.tiltY * Math.PI / 180) * 42;
-    var shineY = 50 - Math.sin(state.tiltX * Math.PI / 180) * 42;
-    elements.cardContent.style.setProperty("--shine-x", shineX + "%");
-    elements.cardContent.style.setProperty("--shine-y", shineY + "%");
-    elements.cardContent.style.setProperty("--flake-hue", (state.tiltY * 5 - state.tiltX * 3) + "deg");
+    var radians = Math.PI / 180;
+    var x = state.tiltX * radians;
+    var y = state.tiltY * radians;
+    var normalX = Math.sin(y);
+    var normalY = -Math.sin(x) * Math.cos(y);
+    elements.cardContent.style.setProperty("--shine-x", (50 + normalX * 42) + "%");
+    elements.cardContent.style.setProperty("--shine-y", (50 + normalY * 42) + "%");
+    elements.cardContent.style.setProperty("--shine-travel", String(Math.hypot(normalX, normalY)));
+    elements.cardContent.style.setProperty("--flake-hue", (normalX * 70 + normalY * 42) + "deg");
     elements.angleX.textContent = Math.round(state.tiltX) + "°";
     elements.angleY.textContent = Math.round(state.tiltY) + "°";
   }
