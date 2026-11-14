@@ -662,7 +662,7 @@ h2 {
   filter: saturate(1.05) contrast(1.18);
 }
 
-.material-effect:is(.effect-silver-glitter, .effect-gold-glitter, .effect-iridescent-brush, .effect-cross-holo, .effect-flake-holo) {
+.material-effect:is(.effect-silver-glitter, .effect-gold-glitter, .effect-iridescent-brush, .effect-flake-holo) {
   mix-blend-mode: normal;
 }
 
@@ -697,16 +697,9 @@ h2 {
   --material-sheen: linear-gradient(126deg, #849eb0 8%, #bbdddf 30%, #f8eee5 48%, #e4cddd 56%, #b4d6d1 74%, #a7b4db 93%);
 }
 
-.effect-cross-holo {
-  background-image:
-    linear-gradient(90deg, transparent 24%, #ffc2ad99 36%, #ffffe4 47%, #8ee8daad 55%, #99aef163 63%, transparent 72%),
-    linear-gradient(0deg, transparent 24%, #f5b1cd99 36%, #ffffe4 47%, #9bdedaad 54%, #a7b7f163 62%, transparent 72%),
-    repeating-linear-gradient(0deg, #ffffff75 0 1px, transparent 1px 4px),
-    repeating-linear-gradient(90deg, #34445060 0 1px, transparent 1px 4px),
-    linear-gradient(135deg, #8b969e, #bac5c6 52%, #5d6873);
-  background-size: 235% 100%, 100% 235%, auto, auto, cover;
-  background-position: var(--shine-x, 50%) 0, 0 var(--shine-y, 50%), 0 0, 0 0, center;
-  background-blend-mode: screen, screen, normal, normal, normal;
+.effect-swatch.effect-cross-holo {
+  position: relative;
+  background: linear-gradient(135deg, #444958, #768396);
 }
 
 .effect-flake-holo {
@@ -716,34 +709,30 @@ h2 {
 }
 
 .material-effect.effect-cross-holo {
-  background-image:
-    repeating-linear-gradient(0deg, #f9faff55 0 1px, transparent 1px 4px),
-    repeating-linear-gradient(90deg, #263a564d 0 1px, transparent 1px 4px),
-    linear-gradient(135deg, #65798f85, #d2deeb4d 53%, #5e627c85);
-  background-size: auto, auto, 100% 100%;
-  background-position: 0 0, 0 0, center;
-  background-blend-mode: normal;
+  background: none;
+  mix-blend-mode: normal;
 }
 
-.material-effect.effect-cross-holo::before {
+.effect-cross-holo::before {
   content: "";
   position: absolute;
   inset: 0;
-  background-image:
-    linear-gradient(90deg, transparent calc(var(--holo-light-x) - 17%), #ffaba06e calc(var(--holo-light-x) - 8%),
-      #fff6dc var(--holo-light-x), #88fce7a0 calc(var(--holo-light-x) + 5%),
-      #8c95fb6e calc(var(--holo-light-x) + 10%), transparent calc(var(--holo-light-x) + 17%)),
-    linear-gradient(180deg, transparent calc(var(--holo-light-y) - 15%), #ceaeff6e calc(var(--holo-light-y) - 8%),
-      #edfaff var(--holo-light-y), #f8ca9fa0 calc(var(--holo-light-y) + 6%),
-      #92f6cd6e calc(var(--holo-light-y) + 10%), transparent calc(var(--holo-light-y) + 15%));
-  background-blend-mode: screen;
-  mix-blend-mode: screen;
-  opacity: calc(.25 + .65 * var(--holo-energy, 0));
+  mask: var(--foil-crosses) 0 0 / 225px 225px repeat;
+}
+
+.effect-swatch.effect-cross-holo::before {
+  background: linear-gradient(125deg, #fee5a9, #d3fff2, #f2aeeb);
+  mask-size: 82px 82px;
+}
+
+.material-effect.effect-cross-holo::before {
+  background: radial-gradient(ellipse at var(--holo-light-x) var(--holo-light-y),
+    #fff7dd 0%, #abffe3e0 12%, #9faaffbf 22%, #ffb0d8a8 32%, #ffdfa36b 44%, #b0d7f428 59%, transparent 77%);
+  opacity: calc(.58 + .42 * var(--holo-energy, 0));
 }
 
 .material-effect.effect-cross-holo::after {
-  background: radial-gradient(ellipse at var(--holo-light-x) var(--holo-light-y), #fff 0%, #fff7 8%, transparent 25%);
-  opacity: calc(.05 + .42 * var(--holo-energy, 0));
+  content: none;
 }
 
 .material-effect.effect-flake-holo {

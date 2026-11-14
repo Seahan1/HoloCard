@@ -64,6 +64,69 @@
     return canvas;
   }
 
+  function createCrossTexture() {
+    var size = 288;
+    var canvas = createCanvas(size, size);
+    var context = canvas.getContext("2d");
+    var centers = [];
+    var seed = 1547;
+
+    function random() {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    }
+
+    while (centers.length < 78) {
+      var x = random() * size;
+      var y = random() * size;
+      var tooClose = centers.some(function (center) {
+        var dx = Math.abs(x - center.x);
+        var dy = Math.abs(y - center.y);
+        return Math.hypot(Math.min(dx, size - dx), Math.min(dy, size - dy)) < 19;
+      });
+      if (tooClose) {
+        continue;
+      }
+      centers.push({ x: x, y: y });
+
+      var radius = 3.4 + random() * 5.6;
+      var arm = radius * 0.14;
+      var rotation = (random() - 0.5) * 0.36;
+
+      // Draw wrapped copies so crosses at tile edges stay whole.
+      for (var row = -1; row <= 1; row += 1) {
+        for (var column = -1; column <= 1; column += 1) {
+          var tx = x + column * size;
+          var ty = y + row * size;
+          if (tx < -radius || tx > size + radius || ty < -radius || ty > size + radius) {
+            continue;
+          }
+          context.save();
+          context.translate(tx, ty);
+          context.rotate(rotation);
+          var fade = context.createRadialGradient(0, 0, 0, 0, 0, radius);
+          fade.addColorStop(0, "#fff");
+          fade.addColorStop(0.35, "#ffffffe0");
+          fade.addColorStop(1, "#ffffff16");
+          context.fillStyle = fade;
+          context.beginPath();
+          context.moveTo(0, -radius);
+          context.lineTo(arm, -arm);
+          context.lineTo(radius, 0);
+          context.lineTo(arm, arm);
+          context.lineTo(0, radius);
+          context.lineTo(-arm, arm);
+          context.lineTo(-radius, 0);
+          context.lineTo(-arm, -arm);
+          context.closePath();
+          context.fill();
+          context.restore();
+        }
+      }
+    }
+    return canvas.toDataURL();
+  }
+
   function setMaterialTextures() {
     var size = 192;
     var grain = createCanvas(size, size);
@@ -111,6 +174,7 @@
 
     document.documentElement.style.setProperty("--glitter-grain", "url(" + JSON.stringify(grain.toDataURL()) + ")");
     document.documentElement.style.setProperty("--foil-flakes", "url(" + JSON.stringify(flakes.toDataURL()) + ")");
+    document.documentElement.style.setProperty("--foil-crosses", "url(" + JSON.stringify(createCrossTexture()) + ")");
   }
 
   function roundRect(context, x, y, width, height, radius) {
