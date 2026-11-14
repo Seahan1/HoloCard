@@ -20,6 +20,7 @@
     tiltX: 0,
     tiltY: 0,
     drag: null,
+    layerDrag: null,
     toastTimer: null
   };
 
@@ -29,6 +30,7 @@
     documentMeta: document.getElementById("documentMeta"),
     layerCount: document.getElementById("layerCount"),
     layerList: document.getElementById("layerList"),
+    layerNotice: document.getElementById("layerNotice"),
     selectedLayerName: document.getElementById("selectedLayerName"),
     cardContent: document.getElementById("cardContent"),
     card: document.getElementById("card"),
@@ -443,6 +445,138 @@
     return elements.layerList.querySelector('[data-layer-id="' + layer.id + '"]');
   }
 
+  function layerBlockEnd(index) {
+    var depth = state.layers[index].depth;
+    var end = index + 1;
+    while (end < state.layers.length && state.layers[end].depth > depth) {
+      end += 1;
+    }
+    return end;
+  }
+
+  function moveLayer(layer, target, after) {
+    var start = state.layers.indexOf(layer);
+    var targetIndex = state.layers.indexOf(target);
+    if (start < 0 || targetIndex < 0 || layer === target || layer.parent !== target.parent) {
+      return;
+    }
+    var end = layerBlockEnd(start);
+    var insertAt = after ? layerBlockEnd(targetIndex) : targetIndex;
+    if (insertAt === start || insertAt === end) {
+      return;
+    }
+    var block = state.layers.splice(start, end - start);
+    var destination = insertAt > start ? insertAt - block.length : insertAt;
+    state.layers = state.layers.slice(0, destination).concat(block, state.layers.slice(destination));
+    renderLayerList();
+    renderCard();
+    var handle = layerRow(layer).querySelector(".layer-handle");
+    handle.focus();
+    elements.layerNotice.textContent = "已将 " + layer.name + " 移到 " + target.name + (after ? " 下方" : " 上方");
+  }
+
+  function startLayerDrag(event, layer, handle) {
+    if (event.button !== 0 || state.layerDrag) {
+      return;
+    }
+    state.layerDrag = { layer: layer, handle: handle, pointerId: event.pointerId, startY: event.clientY };
+    handle.setPointerCapture(event.pointerId);
+  }
+
+  function clearDropMarker(drag) {
+    if (drag.marker) {
+      drag.marker.classList.remove("drop-before", "drop-after");
+    }
+    drag.marker = null;
+    drag.target = null;
+  }
+
+  function updateLayerDropTarget(drag, x, y) {
+    clearDropMarker(drag);
+    var hit = document.elementFromPoint(x, y);
+    var row = hit && hit.closest(".layer-item");
+    if (!row || !elements.layerList.contains(row)) {
+      return;
+    }
+    var target = state.layers.find(function (layer) {
+      return layer.id === row.dataset.layerId;
+    });
+    while (target && target.parent !== drag.layer.parent) {
+      target = target.parent;
+    }
+    if (!target || target === drag.layer) {
+      return;
+    }
+    var firstRow = layerRow(target);
+    var lastRow = layerRow(state.layers[layerBlockEnd(state.layers.indexOf(target)) - 1]);
+    drag.after = y >= (firstRow.getBoundingClientRect().top + lastRow.getBoundingClientRect().bottom) / 2;
+    drag.target = target;
+    drag.marker = drag.after ? lastRow : firstRow;
+    drag.marker.classList.add(drag.after ? "drop-after" : "drop-before");
+  }
+
+  function scrollLayerDrag(drag) {
+    drag.frame = null;
+    var list = elements.layerList;
+    var bounds = list.getBoundingClientRect();
+    if (drag.x < bounds.left || drag.x > bounds.right || drag.y < bounds.top || drag.y > bounds.bottom) {
+      return;
+    }
+    var edge = Math.min(32, bounds.height / 4);
+    var step = clamp((drag.y - bounds.bottom + edge) / edge, 0, 1) -
+      clamp((bounds.top + edge - drag.y) / edge, 0, 1);
+    var previous = list.scrollTop;
+    list.scrollTop += Math.round(step * 12);
+    if (list.scrollTop !== previous) {
+      updateLayerDropTarget(drag, drag.x, drag.y);
+      drag.frame = requestAnimationFrame(function () { scrollLayerDrag(drag); });
+    }
+  }
+
+  function trackLayerDrag(event) {
+    var drag = state.layerDrag;
+    if (!drag || drag.pointerId !== event.pointerId) {
+      return;
+    }
+    if (!drag.active && Math.abs(event.clientY - drag.startY) < 5) {
+      return;
+    }
+    drag.active = true;
+    drag.x = event.clientX;
+    drag.y = event.clientY;
+    layerRow(drag.layer).classList.add("is-reordering");
+    updateLayerDropTarget(drag, drag.x, drag.y);
+    if (drag.frame == null) {
+      drag.frame = requestAnimationFrame(function () { scrollLayerDrag(drag); });
+    }
+  }
+
+  function finishLayerDrag(event) {
+    var drag = state.layerDrag;
+    if (!drag || (event && drag.pointerId !== event.pointerId)) {
+      return;
+    }
+    if (event && event.type === "pointerup" && drag.active) {
+      updateLayerDropTarget(drag, event.clientX, event.clientY);
+    }
+    var target = drag.target;
+    state.layerDrag = null;
+    if (drag.frame != null) {
+      cancelAnimationFrame(drag.frame);
+    }
+    clearDropMarker(drag);
+    var row = layerRow(drag.layer);
+    if (row) {
+      row.classList.remove("is-reordering");
+    }
+    if (drag.handle.hasPointerCapture(drag.pointerId)) {
+      drag.handle.releasePointerCapture(drag.pointerId);
+    }
+    if (event && event.type === "pointerup" && target) {
+      moveLayer(drag.layer, target, drag.after);
+    }
+  }
+
   function renderLayerList() {
     elements.layerList.replaceChildren();
     state.layers.forEach(function (layer) {
@@ -453,6 +587,30 @@
       item.style.setProperty("--layer-indent", layer.depth * 10 + "px");
       item.classList.toggle("is-selected", layer.id === state.selectedId);
       item.classList.toggle("is-hidden", !isLayerVisible(layer));
+
+      var handle = document.createElement("button");
+      handle.type = "button";
+      handle.className = "layer-handle";
+      handle.setAttribute("aria-label", "调整图层顺序：" + layer.name);
+      handle.title = "拖动或用上下方向键排序";
+      handle.textContent = "⠿";
+      handle.addEventListener("pointerdown", function (event) {
+        startLayerDrag(event, layer, handle);
+      });
+      handle.addEventListener("keydown", function (event) {
+        if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+          return;
+        }
+        event.preventDefault();
+        var siblings = state.layers.filter(function (candidate) {
+          return candidate.parent === layer.parent;
+        });
+        var after = event.key === "ArrowDown";
+        var target = siblings[siblings.indexOf(layer) + (after ? 1 : -1)];
+        if (target) {
+          moveLayer(layer, target, after);
+        }
+      });
 
       var select = document.createElement("button");
       select.type = "button";
@@ -497,7 +655,7 @@
       });
 
       select.append(thumb, copy);
-      item.append(select, visibility);
+      item.append(handle, select, visibility);
       select.addEventListener("click", function () {
         state.selectedId = layer.id;
         renderAll();
@@ -708,6 +866,7 @@
         return layer.supported && isLayerVisible(layer);
       });
 
+      finishLayerDrag();
       state.documentWidth = psd.width;
       state.documentHeight = psd.height;
       state.documentName = file.name;
@@ -729,6 +888,11 @@
   }
 
   function bindInteractions() {
+    elements.layerList.addEventListener("pointermove", trackLayerDrag);
+    elements.layerList.addEventListener("pointerup", finishLayerDrag);
+    elements.layerList.addEventListener("pointercancel", finishLayerDrag);
+    elements.layerList.addEventListener("lostpointercapture", finishLayerDrag);
+
     document.querySelectorAll('input[name="preview-background"]').forEach(function (option) {
       if (option.checked) {
         elements.card.dataset.background = option.value;

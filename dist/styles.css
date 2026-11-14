@@ -264,8 +264,9 @@ h2 {
 }
 
 .layer-item {
+  position: relative;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 32px;
+  grid-template-columns: 26px minmax(0, 1fr) 32px;
   align-items: center;
   gap: 4px;
   min-height: 52px;
@@ -289,6 +290,7 @@ h2 {
   background: var(--selected);
 }
 
+.layer-handle,
 .layer-select,
 .layer-visibility {
   min-width: 0;
@@ -299,11 +301,23 @@ h2 {
   color: inherit;
 }
 
+.layer-handle,
 .layer-visibility {
   display: grid;
   place-items: center;
   padding: 0;
   color: var(--muted);
+}
+
+.layer-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  font-size: 18px;
+}
+
+.layer-handle:active {
+  cursor: grabbing;
 }
 
 .layer-select {
@@ -320,9 +334,23 @@ h2 {
   cursor: default;
 }
 
-.layer-item.is-hidden .layer-select {
+.layer-item.is-hidden .layer-select,
+.layer-item.is-reordering {
   opacity: .58;
 }
+
+.layer-item:is(.drop-before, .drop-after)::after {
+  position: absolute;
+  z-index: 1;
+  inset-inline: 0;
+  height: 2px;
+  background: var(--control);
+  content: "";
+  pointer-events: none;
+}
+
+.layer-item.drop-before::after { top: -3px; }
+.layer-item.drop-after::after { bottom: -3px; }
 
 .layer-thumb {
   display: grid;
@@ -352,6 +380,7 @@ h2 {
   cursor: pointer;
 }
 
+.layer-handle:hover,
 .layer-visibility:hover {
   background: var(--line);
 }
