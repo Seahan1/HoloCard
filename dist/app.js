@@ -53,6 +53,55 @@
     return canvas;
   }
 
+  function setMaterialTextures() {
+    var size = 192;
+    var grain = createCanvas(size, size);
+    var flakes = createCanvas(size, size);
+    var grainContext = grain.getContext("2d");
+    var flakeContext = flakes.getContext("2d");
+    var seed = 9173;
+
+    function random() {
+      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
+      return seed / 4294967296;
+    }
+
+    for (var index = 0; index < 6800; index += 1) {
+      var width = 0.45 + random() * 1.65;
+      var light = random() > 0.42 ? 255 : 39;
+      var x = random() * (size - width);
+      var y = random() * (size - width);
+      grainContext.fillStyle = "rgba(" + light + "," + light + "," + light + "," + (0.22 + random() * 0.68) + ")";
+      grainContext.fillRect(x, y, width, width);
+    }
+
+    var cellSize = 16;
+    for (var row = 0; row < size; row += cellSize) {
+      for (var column = 0; column < size; column += cellSize) {
+        var centerX = column + 4 + random() * 8;
+        var centerY = row + 4 + random() * 8;
+        var direction = random() * Math.PI * 2;
+        var hue = random() * 360;
+        for (var petal = 0; petal < 3; petal += 1) {
+          var angle = direction + petal * Math.PI * 2 / 3;
+          var reach = 2 + random() * 2;
+          var spread = 0.44 + random() * 0.27;
+          flakeContext.fillStyle = "hsl(" + (hue + petal * 39) + " 72% " + (62 + random() * 28) + "% / 0.88)";
+          flakeContext.beginPath();
+          flakeContext.moveTo(centerX, centerY);
+          flakeContext.lineTo(centerX + Math.cos(angle - spread) * reach, centerY + Math.sin(angle - spread) * reach);
+          flakeContext.lineTo(centerX + Math.cos(angle) * reach, centerY + Math.sin(angle) * reach);
+          flakeContext.lineTo(centerX + Math.cos(angle + spread) * reach, centerY + Math.sin(angle + spread) * reach);
+          flakeContext.closePath();
+          flakeContext.fill();
+        }
+      }
+    }
+
+    document.documentElement.style.setProperty("--glitter-grain", "url(" + JSON.stringify(grain.toDataURL()) + ")");
+    document.documentElement.style.setProperty("--foil-flakes", "url(" + JSON.stringify(flakes.toDataURL()) + ")");
+  }
+
   function roundRect(context, x, y, width, height, radius) {
     var r = Math.min(radius, width / 2, height / 2);
     context.beginPath();
@@ -460,6 +509,7 @@
     var shineY = clamp(50 - state.tiltX * 2.7, 8, 92);
     elements.cardContent.style.setProperty("--shine-x", shineX + "%");
     elements.cardContent.style.setProperty("--shine-y", shineY + "%");
+    elements.cardContent.style.setProperty("--flake-hue", (state.tiltY * 5 - state.tiltX * 3) + "deg");
     elements.angleX.textContent = Math.round(state.tiltX) + "°";
     elements.angleY.textContent = Math.round(state.tiltY) + "°";
   }
@@ -755,6 +805,7 @@
     });
   }
 
+  setMaterialTextures();
   state.layers = createSampleLayers();
   bindInteractions();
   renderAll();
