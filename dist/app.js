@@ -442,9 +442,10 @@
     });
     var selected = getSelectedLayer();
     elements.documentName.textContent = state.documentName;
-    elements.documentMeta.textContent = state.documentWidth + " × " + state.documentHeight + " px · " + pixelLayers.length + " 个图层";
+    elements.documentMeta.textContent = state.documentWidth + " × " + state.documentHeight + " px";
     elements.layerCount.textContent = String(pixelLayers.length);
     elements.selectedLayerName.textContent = selected ? selected.name : "无可用像素图层";
+    elements.tiltShell.style.setProperty("--document-ratio", String(state.documentWidth / state.documentHeight));
   }
 
   function renderAll() {
@@ -457,8 +458,6 @@
     elements.tiltShell.style.transform = "rotateX(" + state.tiltX + "deg) rotateY(" + state.tiltY + "deg)";
     var shineX = clamp(50 + state.tiltY * 2.7, 8, 92);
     var shineY = clamp(50 - state.tiltX * 2.7, 8, 92);
-    elements.card.style.setProperty("--shine-x", shineX + "%");
-    elements.card.style.setProperty("--shine-y", shineY + "%");
     elements.cardContent.style.setProperty("--shine-x", shineX + "%");
     elements.cardContent.style.setProperty("--shine-y", shineY + "%");
     elements.angleX.textContent = Math.round(state.tiltX) + "°";
@@ -647,6 +646,15 @@
   }
 
   function bindInteractions() {
+    document.querySelectorAll('input[name="preview-background"]').forEach(function (option) {
+      if (option.checked) {
+        elements.card.dataset.background = option.value;
+      }
+      option.addEventListener("change", function () {
+        elements.card.dataset.background = option.value;
+      });
+    });
+
     elements.input.addEventListener("change", function (event) {
       readPsdFile(event.target.files[0]);
     });
@@ -666,7 +674,6 @@
     elements.intensity.addEventListener("input", function () {
       state.intensity = Number(elements.intensity.value);
       elements.intensityValue.textContent = state.intensity + "%";
-      elements.intensity.style.setProperty("--range-fill", state.intensity + "%");
       var effect = elements.cardContent.querySelector(".material-effect");
       if (effect) {
         effect.style.setProperty("--effect-strength", String(state.intensity / 100));
