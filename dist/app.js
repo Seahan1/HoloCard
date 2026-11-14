@@ -7,6 +7,8 @@
   var MAX_LAYER_EDGE = 7000;
   var MAX_LAYER_COUNT = 120;
   var MAX_LAYER_PIXELS = 60000000;
+  var MAX_TILT = 180;
+  var KEYBOARD_TILT_STEP = 5;
   var state = {
     documentWidth: 750,
     documentHeight: 1050,
@@ -17,7 +19,7 @@
     intensity: 68,
     tiltX: 0,
     tiltY: 0,
-    pointerActive: false,
+    drag: null,
     toastTimer: null
   };
 
@@ -30,6 +32,7 @@
     selectedLayerName: document.getElementById("selectedLayerName"),
     cardContent: document.getElementById("cardContent"),
     card: document.getElementById("card"),
+    cardRotator: document.getElementById("cardRotator"),
     tiltShell: document.getElementById("tiltShell"),
     resetTilt: document.getElementById("resetTilt"),
     angleX: document.getElementById("angleX"),
@@ -504,9 +507,9 @@
   }
 
   function updateTiltVisuals() {
-    elements.tiltShell.style.transform = "rotateX(" + state.tiltX + "deg) rotateY(" + state.tiltY + "deg)";
-    var shineX = clamp(50 + state.tiltY * 2.7, 8, 92);
-    var shineY = clamp(50 - state.tiltX * 2.7, 8, 92);
+    elements.cardRotator.style.transform = "rotateX(" + state.tiltX + "deg) rotateY(" + state.tiltY + "deg)";
+    var shineX = 50 + Math.sin(state.tiltY * Math.PI / 180) * 42;
+    var shineY = 50 - Math.sin(state.tiltX * Math.PI / 180) * 42;
     elements.cardContent.style.setProperty("--shine-x", shineX + "%");
     elements.cardContent.style.setProperty("--shine-y", shineY + "%");
     elements.cardContent.style.setProperty("--flake-hue", (state.tiltY * 5 - state.tiltX * 3) + "deg");
@@ -731,43 +734,54 @@
     });
 
     elements.tiltShell.addEventListener("pointerdown", function (event) {
-      if (event.button !== 0) {
+      if (event.button !== 0 || state.drag) {
         return;
       }
-      state.pointerActive = true;
+      var bounds = elements.tiltShell.getBoundingClientRect();
+      state.drag = {
+        pointerId: event.pointerId,
+        x: event.clientX,
+        y: event.clientY,
+        degreesPerPixelX: MAX_TILT * 2 / bounds.width,
+        degreesPerPixelY: MAX_TILT * 2 / bounds.height
+      };
       elements.tiltShell.classList.add("is-dragging");
       elements.tiltShell.setPointerCapture(event.pointerId);
     });
 
     elements.tiltShell.addEventListener("pointermove", function (event) {
-      if (!state.pointerActive) {
+      var drag = state.drag;
+      if (!drag || drag.pointerId !== event.pointerId) {
         return;
       }
-      var bounds = elements.tiltShell.getBoundingClientRect();
-      var horizontal = clamp((event.clientX - bounds.left) / bounds.width, 0, 1);
-      var vertical = clamp((event.clientY - bounds.top) / bounds.height, 0, 1);
-      state.tiltY = (horizontal - 0.5) * 28;
-      state.tiltX = (0.5 - vertical) * 28;
+      state.tiltY = clamp(state.tiltY + (event.clientX - drag.x) * drag.degreesPerPixelX, -MAX_TILT, MAX_TILT);
+      state.tiltX = clamp(state.tiltX - (event.clientY - drag.y) * drag.degreesPerPixelY, -MAX_TILT, MAX_TILT);
+      drag.x = event.clientX;
+      drag.y = event.clientY;
       updateTiltVisuals();
     });
 
-    function endPointer() {
-      state.pointerActive = false;
+    function endPointer(event) {
+      if (!state.drag || state.drag.pointerId !== event.pointerId) {
+        return;
+      }
+      state.drag = null;
       elements.tiltShell.classList.remove("is-dragging");
     }
     elements.tiltShell.addEventListener("pointerup", endPointer);
     elements.tiltShell.addEventListener("pointercancel", endPointer);
+    elements.tiltShell.addEventListener("lostpointercapture", endPointer);
 
     elements.tiltShell.addEventListener("keydown", function (event) {
       var handled = true;
       if (event.key === "ArrowLeft") {
-        state.tiltY = clamp(state.tiltY - 2, -14, 14);
+        state.tiltY = clamp(state.tiltY - KEYBOARD_TILT_STEP, -MAX_TILT, MAX_TILT);
       } else if (event.key === "ArrowRight") {
-        state.tiltY = clamp(state.tiltY + 2, -14, 14);
+        state.tiltY = clamp(state.tiltY + KEYBOARD_TILT_STEP, -MAX_TILT, MAX_TILT);
       } else if (event.key === "ArrowUp") {
-        state.tiltX = clamp(state.tiltX + 2, -14, 14);
+        state.tiltX = clamp(state.tiltX + KEYBOARD_TILT_STEP, -MAX_TILT, MAX_TILT);
       } else if (event.key === "ArrowDown") {
-        state.tiltX = clamp(state.tiltX - 2, -14, 14);
+        state.tiltX = clamp(state.tiltX - KEYBOARD_TILT_STEP, -MAX_TILT, MAX_TILT);
       } else if (event.key === "Home") {
         state.tiltX = 0;
         state.tiltY = 0;

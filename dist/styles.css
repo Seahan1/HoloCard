@@ -459,12 +459,23 @@ h2 {
   aspect-ratio: var(--document-ratio, 5 / 7);
   cursor: grab;
   touch-action: none;
-  transition: transform 320ms ease;
+  transform-style: preserve-3d;
   user-select: none;
 }
 
 .card-shell.is-dragging {
   cursor: grabbing;
+}
+
+.card-rotator {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transform-style: preserve-3d;
+  transition: transform 320ms ease;
+}
+
+.card-shell.is-dragging .card-rotator {
   transition: none;
 }
 
@@ -475,6 +486,11 @@ h2 {
   outline: 1px solid #c2c2c2;
   background: var(--paper);
   box-shadow: 0 10px 22px #3030301a;
+  backface-visibility: hidden;
+}
+
+.card-back {
+  transform: rotateY(180deg);
 }
 
 .card[data-background="transparent"] {

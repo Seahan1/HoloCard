@@ -70,9 +70,12 @@
       </div>
 
       <div id="dropZone" class="card-scene">
-        <div id="tiltShell" class="card-shell" tabindex="0" role="img" aria-label="可拖动旋转的卡牌预览">
-          <div id="card" class="card" data-background="white">
-            <div id="cardContent" class="card-content"></div>
+        <div id="tiltShell" class="card-shell" tabindex="0" role="img" aria-label="可拖动或用方向键旋转的卡牌预览">
+          <div id="cardRotator" class="card-rotator">
+            <div id="card" class="card card-front" data-background="white">
+              <div id="cardContent" class="card-content"></div>
+            </div>
+            <div class="card card-back" aria-hidden="true"></div>
           </div>
         </div>
 
@@ -83,7 +86,7 @@
       </div>
 
       <div class="preview-toolbar">
-        <p class="drag-tip">拖动卡牌查看反光</p>
+        <p class="drag-tip">拖动卡牌查看反光或翻面</p>
         <div class="angle-readout" aria-label="当前卡牌角度">
           <span>X <strong id="angleX">0°</strong></span>
           <span>Y <strong id="angleY">0°</strong></span>
