@@ -535,11 +535,6 @@ h2 {
   inset: 0;
   pointer-events: none;
   transform-style: preserve-3d;
-  transition: transform 320ms ease;
-}
-
-.card-shell.is-dragging .card-rotator {
-  transition: none;
 }
 
 .card {
@@ -565,6 +560,7 @@ h2 {
   inset: 0;
   overflow: hidden;
   isolation: isolate;
+  container-type: size;
 }
 
 .document-layer,
@@ -576,185 +572,115 @@ h2 {
 }
 
 .material-effect {
-  opacity: var(--effect-strength, .68);
-  background-position: var(--shine-x, 50%) var(--shine-y, 50%);
-  background-size: 240% 240%;
-  mix-blend-mode: screen;
-  filter: saturate(1.22) contrast(1.08);
-  -webkit-mask-repeat: no-repeat;
-  -webkit-mask-size: 100% 100%;
+  inset: 0;
+  --light-x: calc(50% + 37% * var(--holo-x));
+  --light-y: calc(50% + 37% * var(--holo-y));
+  --reflection-x: calc(50% - 41% * var(--holo-x));
+  --reflection-y: calc(50% - 34% * var(--holo-y));
+  opacity: calc(var(--effect-strength) * var(--layer-opacity));
   mask-repeat: no-repeat;
-  mask-size: 100% 100%;
 }
 
-.material-effect:is(.effect-rainbow, .effect-cross-holo, .effect-flake-holo) {
-  --holo-light-x: calc(50% + 42% * var(--holo-x, 0));
-  --holo-light-y: calc(50% + 42% * var(--holo-y, 0));
-  --holo-pan-x: calc(50% - 25% * var(--holo-x, 0));
-  --holo-pan-y: calc(50% - 22% * var(--holo-y, 0));
-  opacity: calc(var(--effect-strength, .68) * var(--layer-opacity, 1));
-  filter: none;
+.material-effect::before,
+.material-effect::after {
+  position: absolute;
+  inset: 0;
+}
+
+.material-surface {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .material-effect.effect-rainbow {
-  mix-blend-mode: hard-light;
+  --foil-grating: repeating-linear-gradient(118deg, #c5d0e035 0 .16cqw, #161a2d42 .16cqw .34cqw);
   background-image:
-    var(--glitter-grain),
-    repeating-linear-gradient(126deg, #3a344c 0%, #514b6c 6%, #b7bacb 13%, #514b6c 20%, #3a344c 27%),
-    repeating-linear-gradient(115deg, #e97aa7 0%, #f4cd85 10%, #9be6af 20%, #72d5e4 30%, #9193f0 40%, #e97aa7 50%);
-  background-size: 155px 155px, 235% 235%, 330% 330%;
-  background-position: 0 0, var(--holo-pan-x) var(--holo-pan-y), var(--holo-pan-x) var(--holo-pan-y);
-  background-blend-mode: soft-light, luminosity, normal;
+    var(--foil-grating),
+    linear-gradient(140deg, #4a526b, #829498 44%, #635f75 72%, #424956);
 }
 
 .material-effect.effect-rainbow::before {
   content: "";
-  position: absolute;
-  inset: 0;
   background-image:
-    linear-gradient(10deg, #ed92b9, #f9da93 27%, #69e5ce 51%, #a5aaff 76%, #efa2dc),
-    repeating-linear-gradient(130deg, #24293c 0% 10%, #66768a 13%, #f1f6ff 14%, #66768a 15%, #24293c 18% 24%);
-  background-size: 160% 290%, 290% 195%;
-  background-position:
-    50% calc(50% + 24% * var(--holo-y, 0)),
-    calc(50% - 35% * var(--holo-x, 0)) calc(50% - 15% * var(--holo-y, 0));
-  background-blend-mode: hue, normal;
-  mix-blend-mode: lighten;
-  opacity: calc(.15 + .6 * var(--holo-energy, 0));
-}
-
-.material-effect::after {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: radial-gradient(ellipse at var(--shine-x) var(--shine-y), #fff 0%, #fff7 14%, transparent 54%);
-  mix-blend-mode: screen;
-  opacity: calc(.12 + .32 * var(--shine-travel, 0));
+    var(--foil-grating),
+    repeating-linear-gradient(32deg, #ce688e 0%, #f4ce91 8%, #9ce8ad 16%, #7adaef 24%, #a395ea 32%, #ce688e 40%);
+  background-size: 100% 100%, 225% 240%;
+  background-position: 0 0, calc(50% + 59% * var(--holo-x)) calc(50% - 63% * var(--holo-y));
+  background-blend-mode: soft-light, normal;
+  mask-image: linear-gradient(118deg, transparent 35%, #0004 43%, #000 49% 51%, #0005 56%, transparent 65%);
+  mask-size: 185% 180%;
+  mask-position: calc(44% - 83% * var(--holo-x)) calc(56% - 62% * var(--holo-y));
+  mask-repeat: no-repeat;
 }
 
 .material-effect.effect-rainbow::after {
-  background: radial-gradient(ellipse at var(--holo-light-x) var(--holo-light-y),
-    #fffce8 0%, #e8f8ff70 16%, transparent 57%);
-  opacity: calc(.08 + .58 * var(--holo-energy, 0));
-}
-
-.effect-silver {
-  background-image:
-    linear-gradient(120deg,
-      rgba(21, 27, 35, .62) 0%,
-      rgba(241, 248, 255, .94) 24%,
-      rgba(112, 128, 147, .72) 42%,
-      rgba(255, 255, 255, 1) 55%,
-      rgba(81, 94, 111, .68) 72%,
-      rgba(230, 239, 247, .94) 100%);
-  filter: saturate(.15) contrast(1.24);
-}
-
-.effect-gold {
-  background-image:
-    linear-gradient(120deg,
-      rgba(70, 38, 2, .72) 0%,
-      rgba(255, 220, 106, .96) 23%,
-      rgba(151, 86, 9, .78) 41%,
-      rgba(255, 247, 174, 1) 55%,
-      rgba(177, 103, 12, .8) 73%,
-      rgba(255, 200, 68, .96) 100%);
-  filter: saturate(1.05) contrast(1.18);
-}
-
-.material-effect:is(.effect-silver-glitter, .effect-gold-glitter, .effect-iridescent-brush, .effect-flake-holo) {
-  mix-blend-mode: normal;
-}
-
-.effect-silver-glitter,
-.effect-gold-glitter,
-.effect-iridescent-brush,
-.effect-flake-holo {
-  background-image: var(--material-texture), var(--material-sheen);
-  background-size: var(--texture-size), 240% 240%;
-  background-position: 0 0, var(--shine-x, 50%) var(--shine-y, 50%);
-}
-
-.effect-silver-glitter,
-.effect-gold-glitter {
-  --material-texture: var(--glitter-grain);
-  --texture-size: 144px 144px;
-}
-
-.effect-silver-glitter {
-  --material-sheen: linear-gradient(112deg, #626569 10%, #b6babd 38%, #f7f8f8 50%, #888c90 60%, #dee0e2 81%);
-}
-
-.effect-gold-glitter {
-  --material-sheen: linear-gradient(112deg, #775520 10%, #ae8640 37%, #f8e0a0 50%, #9b732e 63%, #e2bd63 84%);
-}
-
-.effect-iridescent-brush {
-  --material-texture: repeating-linear-gradient(90deg,
-    #fff7 0 1px, transparent 1px 3px, #45576745 3px 4px, transparent 4px 7px,
-    #fff8 7px 8px, transparent 8px 12px, #68778938 12px 13px, transparent 13px 19px);
-  --texture-size: 38px 100%;
-  --material-sheen: linear-gradient(126deg, #849eb0 8%, #bbdddf 30%, #f8eee5 48%, #e4cddd 56%, #b4d6d1 74%, #a7b4db 93%);
-}
-
-.effect-swatch.effect-cross-holo {
-  position: relative;
-  background: linear-gradient(135deg, #444958, #768396);
-}
-
-.effect-flake-holo {
-  --material-texture: var(--foil-flakes);
-  --texture-size: 125px 125px;
-  --material-sheen: linear-gradient(112deg, #636374 8%, #999ca4 32%, #d8e0d7 49%, #9e97b0 60%, #707d90 80%);
-}
-
-.material-effect.effect-cross-holo {
-  background: none;
-  mix-blend-mode: normal;
-}
-
-.effect-cross-holo::before {
   content: "";
-  position: absolute;
-  inset: 0;
-  mask: var(--foil-crosses) 0 0 / 225px 225px repeat;
-}
-
-.effect-swatch.effect-cross-holo::before {
-  background: linear-gradient(125deg, #fee5a9, #d3fff2, #f2aeeb);
-  mask-size: 82px 82px;
-}
-
-.material-effect.effect-cross-holo::before {
-  background: radial-gradient(ellipse at var(--holo-light-x) var(--holo-light-y),
-    #fff7dd 0%, #abffe3e0 12%, #9faaffbf 22%, #ffb0d8a8 32%, #ffdfa36b 44%, #b0d7f428 59%, transparent 77%);
-  opacity: calc(.58 + .42 * var(--holo-energy, 0));
-}
-
-.material-effect.effect-cross-holo::after {
-  content: none;
-}
-
-.material-effect.effect-flake-holo {
-  background-image: var(--foil-flakes), linear-gradient(125deg, #5c5b795c, #bfd0d646 54%, #675a8066);
-  background-size: 125px 125px, 100% 100%;
-  background-position: 0 0, center;
-  background-blend-mode: soft-light, normal;
-}
-
-.material-effect.effect-flake-holo::before {
-  content: "";
-  position: absolute;
-  inset: 0;
-  background: var(--foil-flakes) 0 0 / 125px 125px;
-  filter: hue-rotate(calc(var(--holo-x, 0) * 68deg + var(--holo-y, 0) * 44deg)) saturate(1.4) contrast(1.12);
-  mask-image: radial-gradient(ellipse at var(--holo-light-x) var(--holo-light-y), black 0%, #000b 25%, transparent 73%);
+  background: radial-gradient(ellipse 24% 19% at var(--light-x) var(--light-y), #edf6ff38, transparent);
   mix-blend-mode: screen;
-  opacity: calc(.25 + .75 * var(--holo-energy, 0));
 }
 
-.material-effect.effect-flake-holo::after {
-  content: none;
+.material-effect.effect-silver {
+  --foil-base: #949aa3;
+  --foil-shadow: #333a45;
+  --foil-mid: #b6c0ca;
+  --foil-bright: #d9e5ef;
+  --foil-peak: #f5faff;
+}
+
+.material-effect.effect-gold {
+  --foil-base: #9b6225;
+  --foil-shadow: #552d10;
+  --foil-mid: #cc8c35;
+  --foil-bright: #f6c259;
+  --foil-peak: #fff0c3;
+}
+
+.material-effect:is(.effect-silver, .effect-gold) {
+  background-color: var(--foil-base);
+}
+
+.material-effect:is(.effect-silver, .effect-gold)::before {
+  content: "";
+  background-image: linear-gradient(112deg,
+    var(--foil-mid) 8%, var(--foil-shadow) 34% 43%, var(--foil-mid) 51%,
+    var(--foil-bright) 59% 65%, var(--foil-base) 79%, var(--foil-shadow) 96%);
+  background-size: 195% 195%;
+  background-position: var(--reflection-x) var(--reflection-y);
+  opacity: .88;
+}
+
+.material-effect:is(.effect-silver, .effect-gold)::after {
+  content: "";
+  background-image: linear-gradient(112deg,
+    transparent 51%, var(--foil-bright) 55%, var(--foil-peak) 57% 58%, transparent 61%);
+  background-size: 195% 195%;
+  background-position: var(--reflection-x) var(--reflection-y);
+}
+
+.material-effect.effect-iridescent-brush {
+  background-color: #7e8b97;
+}
+
+.material-effect.effect-iridescent-brush::before {
+  content: "";
+  --brush-width: calc(12% + var(--holo-cross-axis) * 24%);
+  --brush-length: calc(55% - var(--holo-along-axis) * 28%);
+  background-image:
+    linear-gradient(137deg, #adcde0 19%, #c4b3d4 38%, #fff1dd 50%, #afdcd1 60%, #a4b3e5 80%);
+  background-size: 200% 215%;
+  background-position: calc(50% + 49% * var(--holo-x)) calc(50% - 42% * var(--holo-y));
+  mask-image: radial-gradient(ellipse var(--brush-width) var(--brush-length) at var(--light-x) var(--light-y),
+    #000 0%, #000b 43%, transparent 100%);
+  opacity: calc(.83 + .16 * var(--holo-cross-axis) - .26 * var(--holo-along-axis));
+}
+
+.material-effect.effect-iridescent-brush::after {
+  content: "";
+  background-image: repeating-linear-gradient(90deg,
+    #eff5f944 0 .14cqw, transparent .14cqw .37cqw, #2d394352 .37cqw .48cqw,
+    transparent .48cqw .67cqw, #dfeaf147 .67cqw .79cqw, transparent .79cqw 1.06cqw);
+  mix-blend-mode: soft-light;
 }
 
 .drop-prompt {
@@ -850,11 +776,24 @@ h2 {
 }
 
 .effect-swatch:is(.effect-silver-glitter, .effect-gold-glitter) {
-  --texture-size: 76px 76px;
+  background-position: center;
+  background-size: 94px 94px;
+}
+
+.effect-swatch.effect-cross-holo {
+  background-color: #494e5c;
+  background-position: center;
+  background-size: 53px 53px;
 }
 
 .effect-swatch.effect-flake-holo {
-  --texture-size: 54px 54px;
+  background-position: center;
+  background-size: 52px 52px;
+}
+
+.effect-swatch.effect-iridescent-brush {
+  background: repeating-linear-gradient(90deg, #fff6 0 1px, transparent 1px 3px),
+    linear-gradient(125deg, #7e8b97, #cae4df 43%, #e0c9e4 60%, #8299b2);
 }
 
 .swatch-rainbow {

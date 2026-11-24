@@ -8,11 +8,14 @@
   var MAX_LAYER_COUNT = 120;
   var MAX_LAYER_PIXELS = 60000000;
   var MAX_TILT = 180;
+  var HOVER_TILT = 16;
   var KEYBOARD_TILT_STEP = 5;
   var MIN_ZOOM = 0.5;
   var MAX_ZOOM = 3;
   var reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
   var holoLight = { x: 0, y: 0, targetX: 0, targetY: 0, frame: null, time: null };
+  var materialTiles;
+  var materialSurface = null;
   var state = {
     documentWidth: 750,
     documentHeight: 1050,
@@ -64,117 +67,246 @@
     return canvas;
   }
 
-  function createCrossTexture() {
-    var size = 288;
-    var canvas = createCanvas(size, size);
-    var context = canvas.getContext("2d");
-    var centers = [];
-    var seed = 1547;
+  function tiledFacetPath(size, x, y, radius, points) {
+    var path = new Path2D();
+    for (var row = -1; row <= 1; row += 1) {
+      for (var column = -1; column <= 1; column += 1) {
+        var centerX = x + column * size;
+        var centerY = y + row * size;
+        if (centerX + radius < 0 || centerX - radius > size || centerY + radius < 0 || centerY - radius > size) {
+          continue;
+        }
+        path.moveTo(centerX + points[0][0], centerY + points[0][1]);
+        for (var vertex = 1; vertex < points.length; vertex += 1) {
+          path.lineTo(centerX + points[vertex][0], centerY + points[vertex][1]);
+        }
+        path.closePath();
+      }
+    }
+    return path;
+  }
+
+  function polarPoint(radius, angle) {
+    return [Math.cos(angle) * radius, Math.sin(angle) * radius];
+  }
+
+  function createMaterialFacets(effect, size, seed) {
+    var facets = [];
 
     function random() {
       seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
       return seed / 4294967296;
     }
 
-    while (centers.length < 78) {
-      var x = random() * size;
-      var y = random() * size;
-      var tooClose = centers.some(function (center) {
-        var dx = Math.abs(x - center.x);
-        var dy = Math.abs(y - center.y);
-        return Math.hypot(Math.min(dx, size - dx), Math.min(dy, size - dy)) < 19;
+    function randomNormal() {
+      var normalZ = 0.55 + random() * 0.45;
+      var azimuth = random() * Math.PI * 2;
+      var normalRadius = Math.sqrt(1 - normalZ * normalZ);
+      var xy = polarPoint(normalRadius, azimuth);
+      return [xy[0], xy[1], normalZ];
+    }
+
+    function addFacet(x, y, radius, points, roughness, normal, color, diffraction) {
+      facets.push({
+        path: tiledFacetPath(size, x, y, radius, points),
+        normalX: normal[0],
+        normalY: normal[1],
+        normalZ: normal[2],
+        alphaSquared: roughness * roughness,
+        ambient: 0.035 + random() * 0.07,
+        color: color,
+        diffraction: diffraction
       });
-      if (tooClose) {
-        continue;
+    }
+
+    if (effect === "cross-holo") {
+      var centers = [];
+      while (centers.length < 97) {
+        var x = random() * size;
+        var y = random() * size;
+        var tooClose = centers.some(function (center) {
+          var dx = Math.abs(x - center[0]);
+          var dy = Math.abs(y - center[1]);
+          return Math.hypot(Math.min(dx, size - dx), Math.min(dy, size - dy)) < 21;
+        });
+        if (tooClose) {
+          continue;
+        }
+        centers.push([x, y]);
+        var radius = 4.2 + random() * 7.8;
+        var rotation = (random() - 0.5) * 0.42;
+        var coreNormal = randomNormal();
+        for (var arm = 0; arm < 2; arm += 1) {
+          var angle = rotation + arm * Math.PI / 2;
+          var armAxis = polarPoint(1, angle);
+          var armX = coreNormal[0] + armAxis[0] * 0.09;
+          var armY = coreNormal[1] + armAxis[1] * 0.09;
+          var armNormalLength = Math.hypot(armX, armY, coreNormal[2]);
+          var armNormal = [armX / armNormalLength, armY / armNormalLength, coreNormal[2] / armNormalLength];
+          var length = radius * (arm === 0 ? 1 : 0.84);
+          addFacet(x, y, radius, [
+            polarPoint(length, angle),
+            polarPoint(radius * 0.17, angle + Math.PI / 2),
+            polarPoint(length, angle + Math.PI),
+            polarPoint(radius * 0.17, angle - Math.PI / 2)
+          ], 0.16, armNormal, null, armAxis);
+        }
+        addFacet(x, y, radius, [
+          polarPoint(radius * 0.23, rotation),
+          polarPoint(radius * 0.23, rotation + Math.PI / 2),
+          polarPoint(radius * 0.23, rotation + Math.PI),
+          polarPoint(radius * 0.23, rotation - Math.PI / 2)
+        ], 0.14, coreNormal, null, null);
       }
-      centers.push({ x: x, y: y });
-
-      var radius = 3.4 + random() * 5.6;
-      var arm = radius * 0.14;
-      var rotation = (random() - 0.5) * 0.36;
-
-      // Draw wrapped copies so crosses at tile edges stay whole.
-      for (var row = -1; row <= 1; row += 1) {
-        for (var column = -1; column <= 1; column += 1) {
-          var tx = x + column * size;
-          var ty = y + row * size;
-          if (tx < -radius || tx > size + radius || ty < -radius || ty > size + radius) {
-            continue;
+    } else if (effect === "flake-holo") {
+      var palettes = [[0.54, 0.92, 1], [0.89, 0.51, 1], [1, 0.83, 0.52], [0.55, 1, 0.8]];
+      for (var row = 0; row < size; row += 22) {
+        for (var column = 0; column < size; column += 22) {
+          var centerX = column + random() * 22;
+          var centerY = row + random() * 22;
+          var direction = random() * Math.PI * 2;
+          for (var petal = 0; petal < 3; petal += 1) {
+            var axis = direction + petal * Math.PI * 2 / 3;
+            var reach = 4 + random() * 5;
+            var tip = polarPoint(reach, axis);
+            var ridge = polarPoint(reach * 0.53, axis - 0.57);
+            var edge = polarPoint(reach * 0.63, axis + 0.34 + random() * 0.32);
+            var color = palettes[Math.floor(random() * palettes.length)];
+            addFacet(centerX, centerY, reach, [[0, 0], ridge, tip], 0.14, randomNormal(), color, null);
+            addFacet(centerX, centerY, reach, [[0, 0], tip, edge], 0.21, randomNormal(), color, null);
+            addFacet(centerX, centerY, reach, [
+              tip, edge, polarPoint(reach * 0.56, axis + 0.34)
+            ], 0.08, randomNormal(), [0.82, 0.93, 1], null);
           }
-          context.save();
-          context.translate(tx, ty);
-          context.rotate(rotation);
-          var fade = context.createRadialGradient(0, 0, 0, 0, 0, radius);
-          fade.addColorStop(0, "#fff");
-          fade.addColorStop(0.35, "#ffffffe0");
-          fade.addColorStop(1, "#ffffff16");
-          context.fillStyle = fade;
-          context.beginPath();
-          context.moveTo(0, -radius);
-          context.lineTo(arm, -arm);
-          context.lineTo(radius, 0);
-          context.lineTo(arm, arm);
-          context.lineTo(0, radius);
-          context.lineTo(-arm, arm);
-          context.lineTo(-radius, 0);
-          context.lineTo(-arm, -arm);
-          context.closePath();
-          context.fill();
-          context.restore();
         }
       }
+    } else {
+      for (var index = 0; index < 7096; index += 1) {
+        var large = index >= 7000;
+        var grainRadius = large ? 2.6 + random() * 1.6 : 0.7 + random() * 0.8;
+        var grainX = random() * size;
+        var grainY = random() * size;
+        var turn = random() * Math.PI * 2;
+        addFacet(grainX, grainY, grainRadius, [
+          polarPoint(grainRadius, turn),
+          polarPoint(grainRadius * 0.65, turn + Math.PI / 2),
+          polarPoint(grainRadius, turn + Math.PI),
+          polarPoint(grainRadius * 0.65, turn + 3 * Math.PI / 2)
+        ], large ? 0.055 : 0.09, randomNormal(), null, null);
+      }
     }
-    return canvas.toDataURL();
+    return facets;
+  }
+
+  function materialLighting(tiltX, tiltY) {
+    var radians = Math.PI / 180;
+    var cosX = Math.cos(tiltX * radians);
+    var sinX = Math.sin(tiltX * radians);
+    var cosY = Math.cos(tiltY * radians);
+    var sinY = Math.sin(tiltY * radians);
+    var lightLength = Math.hypot(-0.35, -0.45, 1);
+
+    // Map world directions into the material plane with the inverse CSS rotation.
+    function toCard(x, y, z) {
+      var rotatedZ = -sinX * y + cosX * z;
+      return [cosY * x - sinY * rotatedZ, cosX * y + sinX * z, sinY * x + cosY * rotatedZ];
+    }
+
+    var light = toCard(-0.35 / lightLength, -0.45 / lightLength, 1 / lightLength);
+    var view = toCard(0, 0, 1);
+    var sum = light.map(function (value, axis) { return value + view[axis]; });
+    var halfLength = Math.hypot(sum[0], sum[1], sum[2]);
+    var half = sum.map(function (value) { return value / halfLength; });
+    var fresnel = Math.pow(1 - halfLength / 2, 5);
+    return { light: light, view: view, half: half, sum: sum, fresnel: fresnel };
+  }
+
+  function facetReflection(facet, lighting) {
+    function dot(direction) {
+      return facet.normalX * direction[0] + facet.normalY * direction[1] + facet.normalZ * direction[2];
+    }
+
+    var nDotLight = dot(lighting.light);
+    var nDotView = dot(lighting.view);
+    if (nDotLight <= 0 || nDotView <= 0) {
+      return 0;
+    }
+    var nDotHalf = Math.max(0, dot(lighting.half));
+    var alphaSquared = facet.alphaSquared;
+    var denominator = 1 + (alphaSquared - 1) * nDotHalf * nDotHalf;
+    var distribution = alphaSquared / (Math.PI * denominator * denominator);
+    // GGX distribution and height-correlated Smith visibility.
+    var visibility = 0.5 / (
+      nDotLight * Math.sqrt(alphaSquared + (1 - alphaSquared) * nDotView * nDotView) +
+      nDotView * Math.sqrt(alphaSquared + (1 - alphaSquared) * nDotLight * nDotLight)
+    );
+    return distribution * visibility * nDotLight;
+  }
+
+  function linearColor(red, green, blue, alpha) {
+    return "color(srgb-linear " + red + " " + green + " " + blue + " / " + alpha + ")";
+  }
+
+  function paintMaterialTile(tile, material, lighting) {
+    var context = tile.canvas.getContext("2d");
+    var size = tile.canvas.width;
+    context.clearRect(0, 0, size, size);
+    context.fillStyle = material.base;
+    context.fillRect(0, 0, size, size);
+
+    tile.facets.forEach(function (facet) {
+      var response = facetReflection(facet, lighting);
+      if (material.base === "transparent") {
+        var alpha = 1 - 0.94 * Math.exp(-response * 0.68);
+        var color = [0.86, 0.95, 1];
+        if (facet.diffraction) {
+          // First diffraction order, sampled at representative R/G/B wavelengths.
+          var wavelength = 1380 * Math.abs(facet.diffraction[0] * lighting.sum[0] +
+            facet.diffraction[1] * lighting.sum[1]);
+          color = [620, 535, 460].map(function (channel) {
+            return 0.24 + 0.76 * Math.exp(-0.5 * Math.pow((wavelength - channel) / 58, 2));
+          });
+        }
+        context.fillStyle = linearColor(color[0], color[1], color[2], alpha);
+      } else {
+        var tint = facet.color || material.tint;
+        var scale = response * material.exposure;
+        var red = facet.ambient * material.ambient[0] + scale * (tint[0] + (1 - tint[0]) * lighting.fresnel);
+        var green = facet.ambient * material.ambient[1] + scale * (tint[1] + (1 - tint[1]) * lighting.fresnel);
+        var blue = facet.ambient * material.ambient[2] + scale * (tint[2] + (1 - tint[2]) * lighting.fresnel);
+        context.fillStyle = linearColor(red, green, blue, 1);
+      }
+      context.fill(facet.path);
+    });
   }
 
   function setMaterialTextures() {
-    var size = 192;
-    var grain = createCanvas(size, size);
-    var flakes = createCanvas(size, size);
-    var grainContext = grain.getContext("2d");
-    var flakeContext = flakes.getContext("2d");
-    var seed = 9173;
+    var glitter = { canvas: createCanvas(384, 384), facets: createMaterialFacets("glitter", 384, 28411) };
+    var cross = { canvas: createCanvas(384, 384), facets: createMaterialFacets("cross-holo", 384, 1547) };
+    var flakes = { canvas: createCanvas(330, 330), facets: createMaterialFacets("flake-holo", 330, 9173) };
+    materialTiles = {
+      "silver-glitter": { tile: glitter, base: "#424549", ambient: [0.91, 0.96, 1], tint: [0.8554, 0.9024, 0.94], exposure: 0.16 },
+      "gold-glitter": { tile: glitter, base: "#65401a", ambient: [2.6, 1.16, 0.38], tint: [1, 0.77, 0.4], exposure: 0.18 },
+      "cross-holo": { tile: cross, base: "transparent" },
+      "flake-holo": { tile: flakes, base: "#353842", ambient: [0.65, 0.74, 0.9], exposure: 0.24 }
+    };
 
-    function random() {
-      seed = (Math.imul(seed, 1664525) + 1013904223) >>> 0;
-      return seed / 4294967296;
-    }
+    var lighting = materialLighting(0, 0);
+    Object.keys(materialTiles).forEach(function (effect) {
+      var material = materialTiles[effect];
+      paintMaterialTile(material.tile, material, lighting);
+      var swatch = document.querySelector(".effect-swatch.effect-" + effect);
+      swatch.style.backgroundImage = "url(" + JSON.stringify(material.tile.canvas.toDataURL()) + ")";
+    });
+  }
 
-    for (var index = 0; index < 6800; index += 1) {
-      var width = 0.45 + random() * 1.65;
-      var light = random() > 0.42 ? 255 : 39;
-      var x = random() * (size - width);
-      var y = random() * (size - width);
-      grainContext.fillStyle = "rgba(" + light + "," + light + "," + light + "," + (0.22 + random() * 0.68) + ")";
-      grainContext.fillRect(x, y, width, width);
-    }
-
-    var cellSize = 16;
-    for (var row = 0; row < size; row += cellSize) {
-      for (var column = 0; column < size; column += cellSize) {
-        var centerX = column + 4 + random() * 8;
-        var centerY = row + 4 + random() * 8;
-        var direction = random() * Math.PI * 2;
-        var hue = random() * 360;
-        for (var petal = 0; petal < 3; petal += 1) {
-          var angle = direction + petal * Math.PI * 2 / 3;
-          var reach = 2 + random() * 2;
-          var spread = 0.44 + random() * 0.27;
-          flakeContext.fillStyle = "hsl(" + (hue + petal * 39) + " 72% " + (62 + random() * 28) + "% / 0.88)";
-          flakeContext.beginPath();
-          flakeContext.moveTo(centerX, centerY);
-          flakeContext.lineTo(centerX + Math.cos(angle - spread) * reach, centerY + Math.sin(angle - spread) * reach);
-          flakeContext.lineTo(centerX + Math.cos(angle) * reach, centerY + Math.sin(angle) * reach);
-          flakeContext.lineTo(centerX + Math.cos(angle + spread) * reach, centerY + Math.sin(angle + spread) * reach);
-          flakeContext.closePath();
-          flakeContext.fill();
-        }
-      }
-    }
-
-    document.documentElement.style.setProperty("--glitter-grain", "url(" + JSON.stringify(grain.toDataURL()) + ")");
-    document.documentElement.style.setProperty("--foil-flakes", "url(" + JSON.stringify(flakes.toDataURL()) + ")");
-    document.documentElement.style.setProperty("--foil-crosses", "url(" + JSON.stringify(createCrossTexture()) + ")");
+  function paintMaterialSurface(tiltX, tiltY) {
+    var material = materialTiles[state.effect];
+    paintMaterialTile(material.tile, material, materialLighting(tiltX, tiltY));
+    var context = materialSurface.getContext("2d");
+    context.clearRect(0, 0, materialSurface.width, materialSurface.height);
+    context.fillStyle = context.createPattern(material.tile.canvas, "repeat");
+    context.fillRect(0, 0, materialSurface.width, materialSurface.height);
   }
 
   function roundRect(context, x, y, width, height, radius) {
@@ -467,11 +599,8 @@
     return layer.imageUrl;
   }
 
-  function isHolographic(effect) {
-    return effect === "rainbow" || effect === "cross-holo" || effect === "flake-holo";
-  }
-
   function renderCard() {
+    materialSurface = null;
     elements.cardContent.replaceChildren();
     var renderable = state.layers.filter(function (layer) {
       return !layer.isGroup && layer.canvas && isLayerVisible(layer);
@@ -492,13 +621,24 @@
         effect.setAttribute("aria-hidden", "true");
         effect.style.setProperty("--effect-strength", String(state.intensity / 100));
         effect.style.setProperty("--layer-opacity", String(layer.opacity));
-        effect.style.webkitMaskImage = "url(" + JSON.stringify(maskUrl) + ")";
         effect.style.maskImage = "url(" + JSON.stringify(maskUrl) + ")";
-        setPositionStyles(effect, layer);
+        effect.style.maskSize = ((layer.right - layer.left) / state.documentWidth * 100) + "% " +
+          ((layer.bottom - layer.top) / state.documentHeight * 100) + "%";
+        effect.style.maskPosition = "left " + (layer.left / state.documentWidth * 100) + "cqw top " +
+          (layer.top / state.documentHeight * 100) + "cqh";
+        if (materialTiles[state.effect]) {
+          var textureScale = 1050 / Math.max(state.documentWidth, state.documentHeight);
+          materialSurface = createCanvas(
+            Math.ceil(state.documentWidth * textureScale),
+            Math.ceil(state.documentHeight * textureScale)
+          );
+          materialSurface.className = "material-surface";
+          effect.appendChild(materialSurface);
+        }
         elements.cardContent.appendChild(effect);
       }
     });
-    updateTiltVisuals();
+    setHoloLight(state.tiltX, state.tiltY, false);
   }
 
   function makeEyeIcon(hidden) {
@@ -773,12 +913,22 @@
   }
 
   function paintHoloLight() {
+    var tiltX = holoLight.x;
+    var tiltY = holoLight.y;
+    var radians = Math.PI / 180;
+    var normalX = Math.sin(tiltY * radians);
+    var normalY = -Math.sin(tiltX * radians) * Math.cos(tiltY * radians);
     var style = elements.cardContent.style;
-    var x = holoLight.x;
-    var y = holoLight.y;
-    style.setProperty("--holo-x", String(x));
-    style.setProperty("--holo-y", String(y));
-    style.setProperty("--holo-energy", String(Math.min(1, Math.hypot(x, y))));
+    style.setProperty("--holo-x", String(normalX));
+    style.setProperty("--holo-y", String(normalY));
+    style.setProperty("--holo-cross-axis", String(Math.abs(normalX)));
+    style.setProperty("--holo-along-axis", String(Math.abs(normalY)));
+    elements.cardRotator.style.transform = "rotateX(" + tiltX + "deg) rotateY(" + tiltY + "deg)";
+    if (materialSurface) {
+      paintMaterialSurface(tiltX, tiltY);
+    }
+    elements.angleX.textContent = Math.round(tiltX) + "°";
+    elements.angleY.textContent = Math.round(tiltY) + "°";
   }
 
   function animateHoloLight(time) {
@@ -786,7 +936,7 @@
     var fraction = 1 - Math.exp(-elapsed / 55);
     holoLight.x += (holoLight.targetX - holoLight.x) * fraction;
     holoLight.y += (holoLight.targetY - holoLight.y) * fraction;
-    if (Math.hypot(holoLight.targetX - holoLight.x, holoLight.targetY - holoLight.y) < 0.002) {
+    if (Math.hypot(holoLight.targetX - holoLight.x, holoLight.targetY - holoLight.y) < 0.025) {
       setHoloLight(holoLight.targetX, holoLight.targetY, false);
       return;
     }
@@ -814,24 +964,8 @@
     paintHoloLight();
   }
 
-  function cardLightNormal() {
-    var radians = Math.PI / 180;
-    var x = state.tiltX * radians;
-    var y = state.tiltY * radians;
-    return { x: Math.sin(y), y: -Math.sin(x) * Math.cos(y) };
-  }
-
   function updateTiltVisuals() {
-    elements.cardRotator.style.transform = "rotateX(" + state.tiltX + "deg) rotateY(" + state.tiltY + "deg)";
-    var normal = cardLightNormal();
-    var normalX = normal.x;
-    var normalY = normal.y;
-    elements.cardContent.style.setProperty("--shine-x", (50 + normalX * 42) + "%");
-    elements.cardContent.style.setProperty("--shine-y", (50 + normalY * 42) + "%");
-    elements.cardContent.style.setProperty("--shine-travel", String(Math.hypot(normalX, normalY)));
-    setHoloLight(normalX, normalY, false);
-    elements.angleX.textContent = Math.round(state.tiltX) + "°";
-    elements.angleY.textContent = Math.round(state.tiltY) + "°";
+    setHoloLight(state.tiltX, state.tiltY, !state.drag);
   }
 
   function setParserMessage(message, isError) {
@@ -1073,6 +1207,8 @@
         return;
       }
       var bounds = elements.tiltShell.getBoundingClientRect();
+      state.tiltX = holoLight.x;
+      state.tiltY = holoLight.y;
       state.drag = {
         pointerId: event.pointerId,
         x: event.clientX,
@@ -1082,22 +1218,21 @@
       };
       elements.tiltShell.classList.add("is-dragging");
       elements.tiltShell.setPointerCapture(event.pointerId);
-      var normal = cardLightNormal();
-      setHoloLight(normal.x, normal.y, true);
+      updateTiltVisuals();
     });
 
     elements.tiltShell.addEventListener("pointermove", function (event) {
       var drag = state.drag;
       if (!drag) {
-        if (event.pointerType === "mouse" && event.buttons === 0 && isHolographic(state.effect)) {
+        if (event.pointerType === "mouse" && event.buttons === 0) {
           var bounds = elements.tiltShell.getBoundingClientRect();
-          if (bounds.width && bounds.height) {
-            setHoloLight(
-              clamp((event.clientX - bounds.left) / bounds.width * 2 - 1, -1, 1),
-              clamp((event.clientY - bounds.top) / bounds.height * 2 - 1, -1, 1),
-              true
-            );
-          }
+          var x = (event.clientX - bounds.left) / bounds.width * 2 - 1;
+          var y = (event.clientY - bounds.top) / bounds.height * 2 - 1;
+          setHoloLight(
+            clamp(state.tiltX - y * HOVER_TILT, -MAX_TILT, MAX_TILT),
+            clamp(state.tiltY + x * HOVER_TILT, -MAX_TILT, MAX_TILT),
+            true
+          );
         }
         return;
       }
@@ -1112,9 +1247,8 @@
     });
 
     elements.tiltShell.addEventListener("pointerleave", function () {
-      if (!state.drag && isHolographic(state.effect)) {
-        var normal = cardLightNormal();
-        setHoloLight(normal.x, normal.y, true);
+      if (!state.drag) {
+        updateTiltVisuals();
       }
     });
     reducedMotion.addEventListener("change", function () {
